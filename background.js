@@ -1,27 +1,42 @@
 // background.js
 
-// Log the browsing history for the last 7 days
 chrome.runtime.onInstalled.addListener(() => {
   console.log("Extension installed!");
 });
 
-// Fetch browsing history when the extension is clicked
-chrome.action.onClicked.addListener(() => {
+// Function to fetch history in pages (with pagination)
+function fetchHistoryPage(start = 0, results = []) {
   const now = new Date();
-  const sevenDaysAgo = now.getTime() - 7 * 24 * 60 * 60 * 1000;
+  const tenYearsAgo = now.getTime() - 10 * 365 * 24 * 60 * 60 * 1000; // 10 years ago in milliseconds
 
-  // Use the history API to fetch visited pages
   chrome.history.search(
-    { text: "", startTime: sevenDaysAgo, maxResults: 100 },
-    (results) => {
-      console.log("Browsing History:");
-      results.forEach((item) => {
+    { text: "", startTime: tenYearsAgo, maxResults: 1000, start: start },
+    (data) => {
+      if (data.length > 0) {
+        results.push(...data);
+        console.log(`Fetched ${data.length} entries...`);
+
+        // If more results are available, fetch the next page
+        fetchHistoryPage(start + 1000, results);
+      } else {
+        // After pagination, sort by last visit time and log all entries
         console.log(
-          `Title: ${item.title}, URL: ${item.url}, Last Visit: ${new Date(
-            item.lastVisitTime
-          )}`
+          `Finished fetching history. Total entries: ${results.length}`
         );
-      });
+        results.sort((a, b) => a.lastVisitTime - b.lastVisitTime); // Sort by the last visit time
+        results.forEach((entry) => {
+          console.log(
+            `Title: ${entry.title || "No Title"}, URL: ${
+              entry.url
+            }, Last Visit: ${new Date(entry.lastVisitTime)}`
+          );
+        });
+      }
     }
   );
+}
+
+// Start fetching the history starting from the first page
+chrome.action.onClicked.addListener(() => {
+  fetchHistoryPage();
 });
